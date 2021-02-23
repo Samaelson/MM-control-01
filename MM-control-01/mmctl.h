@@ -19,4 +19,9 @@ void recover_after_eject();
 void mmctl_cut_filament(uint8_t filament);
 bool mmctl_IsOk();
 
+//void feed_filament_withSensor(void);
+void feed_filament_withSensor(int steps_pul,int steps_pul_delay,int speed, float acc);
+void engage_pulley(void);
+void disengage_pulley(void);
+
 #endif //_MMCTL_H

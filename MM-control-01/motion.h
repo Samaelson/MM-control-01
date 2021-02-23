@@ -15,6 +15,9 @@ void motion_disengage_idler();
 void motion_feed_to_bondtech();
 void motion_unload_to_finda();
 void motion_door_sensor_detected();
+bool motion_get_door_sensor_status();
+void motion_set_door_sensor_status();
+void motion_reset_door_sensor_status();
 void motion_set_idler(uint8_t idler);
 void rehome();
 

@@ -20,15 +20,31 @@
 #include "version.h"
 #include "config.h"
 #include "motion.h"
+#include "Detect12V24V.h"
+#include "i2c.h"
+#include "pins.h"
+uint8_t tmc2130_mode = STEALTH_MODE;
 
-
-uint8_t tmc2130_mode = NORMAL_MODE;
+bool IR_SENSOR = true;
 
 #if (UART_COM == 0)
 FILE* uart_com = uart0io;
 #elif (UART_COM == 1)
 FILE* uart_com = uart1io;
 #endif //(UART_COM == 0)
+
+
+/*DBG*/#if (UART_DBG == 1)
+/*DBG*/FILE* uart_dbg = uart0io;
+/*DBG*/#endif
+
+
+void fs_guard_set_ovr_status(void);
+void fs_guard_reset_ovr_status(void);
+bool fs_guard_get_ovr_status(void);
+void process_fs_guard(FILE* inout);
+
+
 
 namespace
 {
@@ -72,6 +88,8 @@ enum class S
 static S state;
 
 static void process_commands(FILE* inout);
+/*DBG*/static void process_dbg_commands(FILE* inout);
+static void process_fs_guard(FILE* inout);
 
 static void led_blink(int _no)
 {
@@ -253,7 +271,8 @@ void unrecoverable_error()
 //! @n b - blinking
 void setup()
 {
-    permanentStorageInit();
+  permanentStorageInit();
+
 	shr16_init(); // shift register
 	led_blink(0);
 
@@ -281,6 +300,9 @@ void setup()
 	shr16_set_ena(7);
 	shr16_set_led(0x000);
 
+  //init_i2c();
+  init_fs_guard();
+
     // check if to goto the settings menu
     if (buttonPressed() == Btn::middle)
     {
@@ -290,6 +312,11 @@ void setup()
     tmc2130_init(HOMING_MODE);
     tmc2130_read_gstat(); //consume reset after power up
     uint8_t filament;
+
+/*DBG*/delay(5000);
+/*DBG*/dbg(PSTR("StartUp MMU\n"));
+    
+    
     if(FilamentLoaded::get(filament))
     {
         motion_set_idler(filament);
@@ -361,6 +388,21 @@ void manual_extruder_selector()
 	}
 }
 
+/*DBG*/
+void dbg(const char *fmt){
+  fprintf_P(uart_dbg, fmt);
+  delay(5);
+
+}
+/*DBG*/
+void dbg_val(const char *fmt, uint32_t val){
+
+  fprintf_P(uart_dbg, PSTR("%s: %lu\n"), fmt, val);
+  delay(5);
+
+}
+
+
 //! @brief main loop
 //!
 //! It is possible to manually select filament and feed it when S::Idle.
@@ -374,6 +416,9 @@ void loop()
 {
     process_commands(uart_com);
 
+    //ToDo: Move this to state Printing 
+    process_fs_guard(uart_com);
+        
     switch (state)
     {
     case S::Setup:
@@ -429,6 +474,97 @@ void loop()
         break;
     }
 }
+
+/*DBG*/
+void process_dbg_commands(FILE* inout)
+{
+  static char line[32];
+  static int count = 0;
+  int c = -1;
+  if (count < 32)
+  {
+    if ((c = getc(inout)) >= 0)
+    {
+      if (c == '\r') c = 0;
+      if (c == '\n') c = 0;
+      line[count++] = c;
+    }
+  }
+  else
+  {
+    count = 0;
+    //overflow
+  }
+  int value = 0;
+  int value0 = 0;
+
+  if ((count > 0) && (c == 0))
+  {
+    //line received
+    //printf_P(PSTR("line received: '%s' %d\n"), line, count);
+    count = 0;
+        //! T<nr.> change to filament <nr.>
+    if (sscanf_P(line, PSTR("T%d"), &value) > 0)
+    {
+      if ((value >= 0) && (value < EXTRUDERS))
+      {
+          state = S::Printing;
+        switch_extruder_withSensor(value);
+        fprintf_P(inout, PSTR("ok\n"));
+      }
+    }
+    else if (sscanf_P(line, PSTR("X%d"), &value) > 0)
+    {
+      if (value == 0) //! X0 MMU reset
+        wdt_enable(WDTO_15MS);
+    }
+    else if (sscanf_P(line, PSTR("H%d"), &value) > 0)
+    {
+      if (!isFilamentLoaded){
+        delay(2000);
+        if (value == 0){ //! H0 Home idler
+              home_idler();
+        }
+        else if (value==1){
+              home_idler_smooth();
+        }
+      }
+      fprintf_P(inout, PSTR("ok\n"));
+    }
+    else if (sscanf_P(line, PSTR("MIF%d"), &value) > 0)
+    {
+      if (!isFilamentLoaded){
+              move_proportional(value,0);
+      }
+      fprintf_P(inout, PSTR("ok\n"));
+    }
+    else if (sscanf_P(line, PSTR("MIR%d"), &value) > 0)
+    {
+      if (!isFilamentLoaded){
+              move_proportional((-1)*value,0);
+      }
+      fprintf_P(inout, PSTR("ok\n"));
+    }
+    else if (sscanf_P(line, PSTR("F%d"), &value) > 0)
+    {
+      if ((value >= 0) && (value < EXTRUDERS)) { //! Fx: Selector/Idler set to filament x wiht x=[0,EXTRUDERS-1]
+          if (!isFilamentLoaded){
+            select_extruder(value);
+          }
+          fprintf_P(inout, PSTR("ok\n"));
+      }
+      else{
+        //invalid value      
+      }
+    }
+    else{
+      // unknown commans
+    }
+  }
+  else
+  { //nothing received
+  }  
+ }
 
 //! @brief receive and process commands from serial line
 //! @param[in,out] inout struct connected to serial line to be used
@@ -489,25 +625,70 @@ void process_commands(FILE* inout)
 		{
 			//! M0 set to normal mode
 			//!@n M1 set to stealth mode
-			switch (value) {
-				case 0: tmc2130_mode = NORMAL_MODE; break;
-				case 1: tmc2130_mode = STEALTH_MODE; break;
-				default: return;
-			}
+      uint8_t sysV = getMMU2S_System_Voltage();
+      switch (value) 
+      {
+        case 0:
+          if (sysV < 254 && sysV > 180) 
+          {
+              //filament_lookup_table[0][0] = TYPE_0_MAX_SPPED_PUL;
+              //filament_lookup_table[0][1] = TYPE_1_MAX_SPPED_PUL;
+              //filament_lookup_table[0][2] = TYPE_2_MAX_SPPED_PUL;
+              MAX_SPEED_IDLER = MAX_SPEED_IDL_DEF_NORMAL;
+              MAX_SPEED_SELECTOR = MAX_SPEED_SEL_DEF_NORMAL;
+              GLOBAL_ACC = GLOBAL_ACC_DEF_NORMAL;
+              tmc2130_mode =  NORMAL_MODE;
+          }
+          else
+          {
+            tmc2130_mode = STEALTH_MODE; 
+          }
+          break;
+        case 1: 
+            //for (uint8_t i = 0; i < 3; i++)
+            //  if (filament_lookup_table[0][i] > 1500) filament_lookup_table[0][i] = 1400;
+            MAX_SPEED_IDLER = MAX_SPEED_IDL_DEF_STEALTH;
+            MAX_SPEED_SELECTOR = MAX_SPEED_SEL_DEF_STEALTH;
+            GLOBAL_ACC = GLOBAL_ACC_DEF_STEALTH;
 
-			//init all axes
+            tmc2130_mode = STEALTH_MODE;
+          break;
+        default: return;
+      }
+  		//init all axes
 			tmc2130_init(tmc2130_mode);
 			fprintf_P(inout, PSTR("ok\n"));
 		}
 		//! U<nr.> Unload filament. <nr.> is ignored but mandatory.
 		else if (sscanf_P(line, PSTR("U%d"), &value) > 0)
 		{
-
 			unload_filament_withSensor();
 			fprintf_P(inout, PSTR("ok\n"));
 
 			state = S::Idle;
 		}
+    //! Z<nr.> Free filament.
+    else if (sscanf_P(line, PSTR("Z%d"), &value) > 0)
+    {
+      //! Z0 set fs guard override
+      //!@n reset fs guard override
+      switch(value)
+      {
+        case 0:
+          fs_guard_set_ovr_status();
+          fprintf_P(inout, PSTR("ok\n"));
+        break;
+        case 1:
+          fs_guard_reset_ovr_status();
+          fprintf_P(inout, PSTR("ok\n"));
+        break;
+        default:
+        break;  
+      }
+
+
+      //state = S::Idle;
+    }   
 		else if (sscanf_P(line, PSTR("X%d"), &value) > 0)
 		{
 			if (value == 0) //! X0 MMU reset
@@ -586,3 +767,128 @@ void process_commands(FILE* inout)
 	}
 }
 
+bool last_state = false;
+bool last_isFilamentLoaded = false;
+bool msg_sent = false;
+bool last_door_sensor_status = false;
+bool new_door_sensor_status = false;
+bool last_finda_status = false;
+bool new_finda_status = false;
+bool filamentIsEngaged = false;
+bool fsGuardOverride = false;
+
+void fs_guard_set_ovr_status(void)
+{
+  fsGuardOverride = true;
+}
+
+void fs_guard_reset_ovr_status(void)
+{
+  fsGuardOverride = false;
+}
+
+bool fs_guard_get_ovr_status(void)
+{
+  return fsGuardOverride;
+}
+
+
+
+void process_fs_guard(FILE* inout)
+{
+
+  bool new_state;
+
+  if(fs_guard_get_ovr_status() && digitalRead(A1))
+  {
+    // Override was triggered and filament still triggers finda 
+    if(filamentIsEngaged)
+    {
+      motion_disengage_idler();
+      disengage_pulley();
+      filamentIsEngaged = false;
+    }
+    return;
+  }
+  // Check finda status
+  new_finda_status = digitalRead(A1);
+
+  if(new_finda_status != last_finda_status)
+  {
+    last_finda_status = new_finda_status;
+
+    if(!new_finda_status)
+    {
+      motion_reset_door_sensor_status();
+      fs_guard_reset_ovr_status();
+    }
+/*
+    if(new_finda_status)
+      fprintf_P(inout, PSTR("Filament loaded to selector\n"));
+    else
+    {
+      motion_reset_door_sensor_status();
+      fprintf_P(inout, PSTR("Filament unloaded from selector\n"));
+    }
+*/
+  }
+
+  // check printer door gate sensor status
+  new_door_sensor_status = motion_get_door_sensor_status();
+
+  if(new_door_sensor_status != last_door_sensor_status)
+  {
+    last_door_sensor_status = new_door_sensor_status;
+    if(new_door_sensor_status)
+    {
+      //fprintf_P(inout, PSTR("Filament loaded to printer. Idler engaged\n"));
+      motion_engage_idler();
+      engage_pulley();
+      filamentIsEngaged = true;
+    }
+    else
+    {
+      //fprintf_P(inout, PSTR("Filament unloaded from printer. Idler disengaged\n"));
+      motion_disengage_idler();
+      disengage_pulley();
+      filamentIsEngaged = false;
+    }
+  }
+ /*
+  // First of all check if filament is loaded
+  if(!digitalRead(A1) && motion_get_door_sensor_status())
+  {
+      // Finda not triggered
+      if(!msg_sent) {fprintf_P(inout, PSTR("motion_door_sensor_status resetted\n")); msg_sent=true;}
+         
+      motion_reset_door_sensor_status();  
+      return;
+  }
+*/
+  // check if filament is still loaded into printer and triggered door gate sensor 
+  if(!motion_get_door_sensor_status() || !filamentIsEngaged) return;
+
+  //fprintf_P(inout, PSTR("Filament in Printer\n"));
+  
+  // Filement is loaded, so get the state of the fs guard
+  new_state = get_fs_guard_status();
+  
+  // check for state change
+  if(last_state == new_state) return;
+  
+  last_state = new_state;
+
+  if(new_state == true)
+  {
+    //fprintf_P(inout, PSTR("fs_guard triggered\n"));
+    
+    feed_filament_withSensor(30000, 3000, 10, GLOBAL_ACC);
+  }
+  else
+  {
+    //fprintf_P(inout, PSTR("fs_guard not triggered\n"));
+    //feed_filament_with_sensor();
+    //motion_disengage_idler();
+  }  
+  
+}

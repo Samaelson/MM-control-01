@@ -16,6 +16,9 @@ static uint8_t s_selector = 0;
 static bool s_selector_homed = false;
 static bool s_idler_engaged = true;
 static bool s_has_door_sensor = false;
+static bool s_status_door_sensor = false;
+
+
 
 void rehome()
 {
@@ -99,16 +102,20 @@ static void check_idler_drive_error()
 
 void motion_engage_idler()
 {
-    s_idler_engaged = true;
-    park_idler(true);
-    check_idler_drive_error();
+//    if(s_idler_engaged == false){
+      s_idler_engaged = true;
+      park_idler(true);
+      check_idler_drive_error();
+//    }
 }
 
 void motion_disengage_idler()
 {
+//  if(s_idler_engaged == true){
     s_idler_engaged = false;
     park_idler(false);
     check_idler_drive_error();
+//  }
 }
 
 //! @brief unload until FINDA senses end of the filament
@@ -169,7 +176,7 @@ void motion_feed_to_bondtech()
             if (i > (steps - 800) && stepPeriod < 2600) stepPeriod += 10;
             if ('A' == getc(uart_com))
             {
-                s_has_door_sensor = true;
+                motion_door_sensor_detected();
                 tmc2130_disable_axis(AX_PUL, tmc2130_mode);
                 motion_disengage_idler();
                 return;
@@ -200,6 +207,9 @@ void motion_unload_to_finda()
     const uint8_t tries = 2;
     for (uint8_t tr = 0; tr <= tries; ++tr)
     {
+        // Unload triggered so stop fs guard
+        motion_reset_door_sensor_status();
+        
         unload_to_finda();
         if (tmc2130_read_gstat() && digitalRead(A1) == 1)
         {
@@ -217,8 +227,26 @@ void motion_unload_to_finda()
 
 void motion_door_sensor_detected()
 {
-    s_has_door_sensor = true;
+  s_has_door_sensor = true;
+  motion_set_door_sensor_status();
 }
+
+bool motion_get_door_sensor_status()
+{
+    return s_status_door_sensor;
+}
+
+void motion_reset_door_sensor_status()
+{
+  s_status_door_sensor = false;
+}
+
+void motion_set_door_sensor_status()
+{
+  s_status_door_sensor = true;
+}
+
+
 
 void motion_set_idler(uint8_t idler)
 {

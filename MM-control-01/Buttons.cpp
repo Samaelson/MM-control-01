@@ -182,7 +182,7 @@ void settings_bowden_length()
 		BowdenLength bowdenLength;
 		load_filament_withSensor(false);
 
-		tmc2130_init_axis_current_normal(AX_PUL, 1, 30);
+		tmc2130_init_axis_current_normal(AX_PUL, 1, 30, false);
 		uint32_t saved_millis=millis();
 		bool button_active = false;
 		do

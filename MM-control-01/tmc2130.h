@@ -3,6 +3,9 @@
 #define _TMC2130_H
 
 #include <inttypes.h>
+#include <stdbool.h>
+#include "config.h"
+#include "shr16.h"
 
 #define TMC2130_SG_THR         4       // SG_THR default
 #define TMC2130_TCOOLTHRS      450     // TCOOLTHRS default
@@ -24,7 +27,7 @@ extern "C" {
 extern int8_t tmc2130_init(uint8_t mode);
 
 extern int8_t tmc2130_init_axis(uint8_t axis, uint8_t mode);
-extern int8_t tmc2130_init_axis_current_normal(uint8_t axis, uint8_t current_h, uint8_t current_r);
+extern int8_t tmc2130_init_axis_current_normal(uint8_t axis, uint8_t current_h, uint8_t current_r, bool homing);
 extern int8_t tmc2130_init_axis_current_stealth(uint8_t axis, uint8_t current_h, uint8_t current_r);
 extern void tmc2130_disable_axis(uint8_t axis, uint8_t mode);
 
@@ -32,6 +35,9 @@ extern uint8_t tmc2130_check_axis(uint8_t axis);
 
 extern uint16_t tmc2130_read_sg(uint8_t axis);
 extern uint8_t tmc2130_read_gstat();
+
+extern uint8_t tmc2130_read_drv_status(uint8_t axis, uint32_t* result);
+extern uint8_t tmc2130_read_axis_gstat(uint8_t axis, uint32_t* result);
 
 
 #if defined(__cplusplus)

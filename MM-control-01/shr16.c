@@ -7,7 +7,7 @@
 
 uint16_t shr16_v;
 
-static void shr16_write(uint16_t v);
+//static void shr16_write(uint16_t v);
 
 void shr16_init(void)
 {

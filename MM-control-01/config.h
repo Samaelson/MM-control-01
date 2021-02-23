@@ -3,6 +3,9 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
+//i2c
+#define SCL_CLOCK 400000L
+
 //timer0
 //#define TIMER0_EVERY_1ms    _every_1ms    //1ms callback
 //#define TIMER0_EVERY_10ms   _every_10ms   //10ms callback
@@ -40,6 +43,18 @@
 #define SHR16_DIR_MSK        (SHR16_DIR_0 + SHR16_DIR_1 + SHR16_DIR_2)
 #define SHR16_ENA_MSK        (SHR16_ENA_0 + SHR16_ENA_1 + SHR16_ENA_2)
 
+
+// TMC2130 Direction/Enable signals - hardcoded
+/*
+#define SHR16_DIR_PUL          0x0001
+#define SHR16_ENA_PUL          0x0002
+#define SHR16_DIR_SEL          0x0004
+#define SHR16_ENA_SEL          0x0008
+#define SHR16_DIR_IDL          0x0010
+#define SHR16_ENA_IDL          0x0020
+#define SHR16_DIR_MSK        (SHR16_DIR_PUL + SHR16_DIR_SEL + SHR16_DIR_IDL)
+#define SHR16_ENA_MSK        (SHR16_ENA_PUL + SHR16_ENA_SEL + SHR16_ENA_IDL)
+*/
 //UART0
 #define UART0_BDR 115200
 
@@ -49,7 +64,9 @@
 //stdin & stdout uart0/1
 #define UART_STD 0
 //communication uart0/1
-#define UART_COM 1
+#define UART_COM 1  
+
+#define UART_DBG 1
 
 //TMC2130 - Trinamic stepper driver
 //pinout - hardcoded
@@ -57,12 +74,26 @@
 #define TMC2130_SPI_RATE       0 // fosc/4 = 4MHz
 #define TMC2130_SPCR           SPI_SPCR(TMC2130_SPI_RATE, 1, 1, 1, 0)
 #define TMC2130_SPSR           SPI_SPSR(TMC2130_SPI_RATE)
-//params:
+
+// params:
+// SG_THR stallguard treshold (sensitivity), range -64..63
+// the stall guard value represents the load angle. if it reaches 0,
+// the motor stalls. It's a 10 bit value, with  1023 in idle load (theoretically)
+// According to the whole setup, that treshold should be tuned for accurate
+// stall detection.
+// Tuning: increase treshold, if stall detection triggers at normal loads
+//   decrese treshold, if stall detection triggers too late
 // SG_THR stallguard treshold (sensitivity), range -128..127, real 0-3
-#define TMC2130_SG_THR_0       5
-#define TMC2130_SG_THR_1       6
-#define TMC2130_SG_THR_2       1
-// TCOOLTHRS coolstep treshold, usable range 400-600
+#define TMC2130_SG_THR_0       5 // PUL
+#define TMC2130_SG_THR_1       6 // SEL
+#define TMC2130_SG_THR_2       1 //IDL
+//#define TMC2130_SG_THR_PUL 5
+//#define TMC2130_SG_THR_SEL 5
+//#define TMC2130_SG_THR_IDL 7
+#define TMC2130_SG_THR_HOM_IDL 5
+
+// TCOOLTHRS coolstep treshold, usable range 400-600, unit is 1/13MHz ~= 75ns
+// below that equivalent speed the stall detection is disabled
 #define TMC2130_TCOOLTHRS_0    450
 #define TMC2130_TCOOLTHRS_1    450
 #define TMC2130_TCOOLTHRS_2    450
@@ -75,11 +106,30 @@
 #define AX_IDL 2
 
 // currents
-#define CURRENT_HOLDING_STEALTH {1, 7, 22}  // {?,?,570 mA}
-#define CURRENT_HOLDING_NORMAL {1, 10, 22}  // {?,?,570 mA}
-#define CURRENT_RUNNING_STEALTH {35, 35, 45} // {?,?,910 mA}
-#define CURRENT_RUNNING_NORMAL {30, 35, 47} // {?,?,910 mA}
-#define CURRENT_HOMING {1, 35, 30}
+/*
+#define CURRENT_HOLDING_STEALTH           { 1,  7, 22}  // {?,?,570 mA}
+#define CURRENT_HOLDING_STEALTH_LOADING   { 1,  7, 45}
+#define CURRENT_HOLDING_NORMAL            { 1, 10, 22}  // {?,?,570 mA}
+#define CURRENT_HOLDING_NORMAL_LOADING    { 1,  7, 45}
+#define CURRENT_RUNNING_STEALTH           {35, 35, 45} // {?,?,910 mA}
+#define CURRENT_RUNNING_NORMAL            {30, 35, 47} // {?,?,910 mA}
+#define CURRENT_HOMING                    { 1, 35, 30}
+*/
+#define CURRENT_HOLDING_STEALTH         { 1,  7, 20}
+#define CURRENT_HOLDING_STEALTH_LOADING { 1,  7, 40}
+#define CURRENT_HOLDING_NORMAL          { 1,  7, 20}
+#define CURRENT_HOLDING_NORMAL_LOADING  { 1,  7, 40}
+#define CURRENT_RUNNING_STEALTH         {35, 35, 40}
+#define CURRENT_RUNNING_NORMAL          {30, 35, 40}
+#define CURRENT_HOMING                  { 1, 35, 30}
+
+// speeds and accelerations
+#define MAX_SPEED_SEL_DEF_NORMAL  6000 // micro steps
+#define MAX_SPEED_IDL_DEF_NORMAL  5000 // micro steps
+#define GLOBAL_ACC_DEF_NORMAL    80000 // micro steps / s²
+#define MAX_SPEED_SEL_DEF_STEALTH 2000 // micro steps
+#define MAX_SPEED_IDL_DEF_STEALTH 3000 // micro steps
+#define GLOBAL_ACC_DEF_STEALTH   30000 // micro steps / s²
 
 //mode
 #define HOMING_MODE 0
