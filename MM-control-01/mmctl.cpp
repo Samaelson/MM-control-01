@@ -140,7 +140,7 @@ void feed_filament_withSensor(int steps_pul,int steps_pul_delay,int speed, float
     int stepsLeft = 0;
     int stepsOverall = 0;
     int steps_pul_remain = 0;
-
+    bool fs_guard_disarmed = false;
 
     State st = Accelerate;
 
@@ -160,8 +160,9 @@ void feed_filament_withSensor(int steps_pul,int steps_pul_delay,int speed, float
         steps_pul_remain--;
       }
 
-      if(!get_fs_guard_status())
+      if(!get_fs_guard_status() && fs_guard_disarmed == false)
       {
+         fs_guard_disarmed = true;
          steps_pul_remain=steps_pul_delay;
       }
             
