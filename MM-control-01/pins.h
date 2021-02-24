@@ -10,9 +10,9 @@
 extern "C" {
 #endif //defined(__cplusplus)
 
-extern void init_fs_guard();
+extern void init_fs_butler();
 
-extern bool get_fs_guard_status();
+extern bool get_fs_butler_status();
 
 //const uint8_t selector_step_pin = 0x10;
 

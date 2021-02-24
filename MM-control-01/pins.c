@@ -5,20 +5,17 @@
 #include <avr/io.h>
 #include "pins.h"
 
-//#define PIN_D7 1 // D7 -> PE6
 
-//const uint8_t D7_PIN = 0xBF;
-
-#define PINE6 6
+//#define PINE6 6
 #define PIND0 0
 
-void init_fs_guard()
+void init_fs_butler()
 {
 //  DDRE &= ~(1 << PINE6); // configure D7 as input
   DDRD &= ~(1 << PIND0); // configure SCL as input
 }
 
-bool get_fs_guard_status()
+bool get_fs_butler_status()
 {
 //  if((PINE & (1 << PINE6))) return false;
   if((PIND & (1 << PIND0))) return false;

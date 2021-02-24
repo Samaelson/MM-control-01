@@ -107,7 +107,6 @@ bool feed_filament(bool timeout)
 
 void engage_pulley(void)
 {
-  //motion_engage_idler();
   if(tmc2130_mode == NORMAL_MODE)
   {
     tmc2130_init_axis_current_normal(AX_PUL, 1, 15, false);
@@ -121,123 +120,52 @@ void engage_pulley(void)
 
 void disengage_pulley(void)
 {
-
   tmc2130_disable_axis(AX_PUL, tmc2130_mode);
-  //motion_disengage_idler();
-  
 }
 
-
-void feed_filament_withSensor(int steps_pul,int steps_pul_delay,int speed, float acc)
-{
-    int steps = 0;
-    
-    float vMax = speed;
-    float v0 = 200; // steps/s, minimum speed
-    float v = v0; // current speed
-    int accSteps = 0; // number of steps for acceleration
-    int stepsDone = 0;
-    int stepsLeft = 0;
-    int stepsOverall = 0;
-    int steps_pul_remain = 0;
-    bool fs_guard_disarmed = false;
-
-    State st = Accelerate;
-
-    // gets steps to be done and set direction
-    if (steps_pul < 0) steps_pul = steps_pul * -1;
-    set_pulley_dir_push();
-    if(steps_pul !=0) steps_pul_remain = steps_pul;
-
-    stepsOverall = steps_pul_remain;
-    stepsLeft = stepsOverall;
-   
-    while(stepsLeft > 0)
-    {
-      if(steps_pul_remain > 0)
-      {
-        do_pulley_step();
-        steps_pul_remain--;
-      }
-
-      if(!get_fs_guard_status() && fs_guard_disarmed == false)
-      {
-         fs_guard_disarmed = true;
-         steps_pul_remain=steps_pul_delay;
-      }
-            
-      stepsLeft = steps_pul_remain;
-      stepsDone = stepsOverall-stepsLeft;
-       
-      float dt = 1 / v;
-      delayMicroseconds(1e6 * dt);
-
-      switch (st) 
-      {
-        case Accelerate:
-            v += acc * dt;
-            if (v >= vMax) {
-                accSteps = stepsDone;
-                st = ConstVelocity;
-                v = vMax;
-            } else if (stepsDone > stepsLeft) {
-                accSteps = stepsDone;
-                st = Decelerate;
-            }
-            break;
-        case ConstVelocity: {
-            if (stepsLeft <= accSteps) {
-                st = Decelerate;
-            }
-        }
-        break;
-        case Decelerate: {
-            v -= acc * dt;
-            if (v < v0) {
-                v = v0;
-            }
-        }
-        break;
-        }
-   
-   }
-}
-
-
-
-
-/*
-void feed_filament_withSensor(void)
+//! @brief Feed filament to printer
+//!
+//! Feed filament to printer for x steps while monitoring
+//! filament sensor of butler 
+//!
+void feed_filament_withSensor(int steps)
 {
   int delay;
   int loop_cntr = 0;
   set_pulley_dir_push();
 
+  int _steps = steps;
+
   do      
   {
     do_pulley_step();
 
-    if(loop_cntr > 0 && loop_cntr < 25) 
+    if(loop_cntr > 0 && loop_cntr < 5) 
     {
-      delay = 750;
+      delay = 3000;
       loop_cntr++;
     }
-    if(loop_cntr >= 25 && loop_cntr < 225) 
+    if(loop_cntr >= 5 && loop_cntr < 2000) 
     {
       delay--;
       loop_cntr++;
     }
     else
     {
-      delay = 500;
+      delay = 1000;
     }
     
     delayMicroseconds(delay);
+
+    _steps--; 
     
-        
-  }while(get_fs_guard_status() == true);
+    // reset steps if fs butler is still triggered
+    if(get_fs_butler_status() == true) _steps = steps;
+
+  }while(_steps > 0);
+
 }
-*/
+
 
 
 //! @brief Try to resolve non-loaded filamnt to selector
@@ -811,6 +739,7 @@ void load_filament_inPrinter()
     unsigned long delay = fist_segment_delay;
 
     for (int i = 0; i < 770; i++)
+//    for (int i = 0; i < 790; i++)
     {
         delayMicroseconds(delay);
         unsigned long now = micros();
