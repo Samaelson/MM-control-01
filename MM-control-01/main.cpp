@@ -875,7 +875,7 @@ void process_fs_butler(void)
 
   if(new_state == true)
   {
-    feed_filament_withSensor(110); //1 pulley ustep = (d*pi)/(mres*FSPR) = 49.48 um --> 110 = ~5.5mm
+    feed_filament_withSensor(70); //1 pulley ustep = (d*pi)/(mres*FSPR) = 49.48 um --> 110 = ~5.5mm / 70 =~3.5mm
   }
   // else do nothing
 }
