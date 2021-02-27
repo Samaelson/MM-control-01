@@ -604,7 +604,7 @@ void process_commands(FILE* inout)
 		{
 			if ((value >= 0) && (value < EXTRUDERS))
 			{
-        fs_butler_set_ovr_status();
+        //fs_butler_set_ovr_status();
 			  state = S::Printing;
 				switch_extruder_withSensor(value);
 				fprintf_P(inout, PSTR("ok\n"));
@@ -613,7 +613,7 @@ void process_commands(FILE* inout)
         //! L<nr.> Load filament <nr.>
 		else if (sscanf_P(line, PSTR("L%d"), &value) > 0)
 		{
-			fs_butler_set_ovr_status();
+			//fs_butler_set_ovr_status();
 			if ((value >= 0) && (value < EXTRUDERS))
 			{
 			    if (isFilamentLoaded) state = S::SignalFilament;
@@ -666,7 +666,7 @@ void process_commands(FILE* inout)
 		//! U<nr.> Unload filament. <nr.> is ignored but mandatory.
 		else if (sscanf_P(line, PSTR("U%d"), &value) > 0)
 		{
-			fs_butler_set_ovr_status();
+			//fs_butler_set_ovr_status();
 			unload_filament_withSensor();
 			fprintf_P(inout, PSTR("ok\n"));
 
@@ -734,7 +734,7 @@ void process_commands(FILE* inout)
 		{
 			if ((value >= 0) && (value < EXTRUDERS)) //! E<nr.> eject filament
 			{
-				fs_butler_set_ovr_status();
+				//fs_butler_set_ovr_status();
 				eject_filament(value);
 				fprintf_P(inout, PSTR("ok\n"));
 				state = S::Printing;
@@ -744,7 +744,7 @@ void process_commands(FILE* inout)
 		{
 			if (value == 0) //! R0 recover after eject filament
 			{
-				fs_butler_set_ovr_status();
+				//fs_butler_set_ovr_status();
 				recover_after_eject();
 				fprintf_P(inout, PSTR("ok\n"));
 				state = S::Idle;
@@ -754,7 +754,7 @@ void process_commands(FILE* inout)
         {
             if (value == 0) //! W0 Wait for user click
             {
-                fs_butler_set_ovr_status();
+                //fs_butler_set_ovr_status();
                 state = S::Wait;
             }
         }
@@ -762,7 +762,7 @@ void process_commands(FILE* inout)
         {
             if ((value >= 0) && (value < EXTRUDERS)) //! K<nr.> cut filament
             {
-                fs_butler_set_ovr_status();
+                //fs_butler_set_ovr_status();
                 mmctl_cut_filament(value);
                 fprintf_P(inout, PSTR("ok\n"));
             }
@@ -803,6 +803,17 @@ void fs_butler_set_ovr_status(void)
 void fs_butler_reset_ovr_status(void)
 {
   fs_butler_override = false;
+      
+  if(digitalRead(A1))
+  {
+    
+    if(!filamentIsEngaged)
+    {
+      motion_engage_idler();
+      engage_pulley();
+      filamentIsEngaged = true;
+    }
+  }
 }
 
 bool fs_butler_get_ovr_status(void)
@@ -812,6 +823,43 @@ bool fs_butler_get_ovr_status(void)
 
 
 
+void process_fs_butler(void)
+{
+  bool new_state;
+  
+  if(fs_butler_get_ovr_status()) return;
+
+  // Check finda status
+  new_finda_status = digitalRead(A1);
+  if(new_finda_status != last_finda_status)
+  {
+    last_finda_status = new_finda_status;
+
+    if(!new_finda_status)
+    {
+      // Filament no longer triggering finda
+      fs_butler_set_ovr_status();
+      return;
+    }
+  }
+
+  // Filement is loaded, so get the state of the fs butler sensor
+  new_state = get_fs_butler_status();
+  
+  // check for state change
+  if(last_state == new_state) return;
+  
+  last_state = new_state;
+
+  if(new_state == true)
+  {
+    feed_filament_withSensor(70); //1 pulley ustep = (d*pi)/(mres*FSPR) = 49.48 um --> 110 = ~5.5mm / 70 =~3.5mm
+  }
+  // else do nothing
+
+}
+
+/*
 void process_fs_butler(void)
 {
 
@@ -862,6 +910,10 @@ void process_fs_butler(void)
     }
   }
 
+  if(!motion_get_door_sensor_status()) led_blink(1);
+  if(!!filamentIsEngaged) led_blink(2);
+  
+
   // check if filament is still loaded into printer and triggered door gate sensor 
   if(!motion_get_door_sensor_status() || !filamentIsEngaged) return;
 
@@ -879,3 +931,5 @@ void process_fs_butler(void)
   }
   // else do nothing
 }
+
+*/

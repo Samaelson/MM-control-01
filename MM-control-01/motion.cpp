@@ -177,7 +177,7 @@ void motion_feed_to_bondtech()
             if ('A' == getc(uart_com))
             {
                 motion_door_sensor_detected();
-                tmc2130_disable_axis(AX_PUL, tmc2130_mode);
+                //tmc2130_disable_axis(AX_PUL, tmc2130_mode);
                 motion_disengage_idler();
                 return;
             }
