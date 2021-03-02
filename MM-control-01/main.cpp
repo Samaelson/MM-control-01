@@ -687,6 +687,10 @@ void process_commands(FILE* inout)
           fs_butler_reset_ovr_status();
           fprintf_P(inout, PSTR("ok\n"));
         break;
+        case 3: // Status request received
+		  // ToDo: Add sensor check here
+          fprintf_P(inout, PSTR("ok\n"));
+        break;
         default:
         break;  
       }
