@@ -1,4 +1,4 @@
-# MM-control-01
+# MM-control-01 with filament butler support
 MMU 3-axis stepper control
 [![Build Status](https://api.travis-ci.org/prusa3d/MM-control-01.svg?branch=master)](https://api.travis-ci.org/prusa3d/MM-control-01.svg?branch=master)
 ## Table of contents
