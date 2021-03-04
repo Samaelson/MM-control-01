@@ -677,22 +677,24 @@ void process_commands(FILE* inout)
     {
       //!V0 set fs butler override
       //!V1 reset fs butler override
-      switch(value)
+      //!V3 return butler 'status' to printer 
+      if (value == 0)
       {
-        case 0: // Disengage filament
-          fs_butler_set_ovr_status();
-          fprintf_P(inout, PSTR("ok\n"));
-        break;
-        case 1: // Engage filament
-          fs_butler_reset_ovr_status();
-          fprintf_P(inout, PSTR("ok\n"));
-        break;
-        case 3: // Status request received
-		  // ToDo: Add sensor check here
-          fprintf_P(inout, PSTR("ok\n"));
-        break;
-        default:
-        break;  
+        // Disengage filament
+        fs_butler_set_ovr_status();
+        fprintf_P(inout, PSTR("ok\n"));
+      }
+      else if (value == 1)
+      {
+        // Engage filament
+        fs_butler_reset_ovr_status();
+        fprintf_P(inout, PSTR("ok\n"));
+      }
+      else if (value == 3)
+      {
+        // Status request received
+        // ToDo: Add sensor check here
+        fprintf_P(inout, PSTR("ok\n"));
       }
     }   
 		else if (sscanf_P(line, PSTR("X%d"), &value) > 0)
