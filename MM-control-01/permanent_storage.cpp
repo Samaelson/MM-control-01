@@ -35,12 +35,14 @@ static const uint8_t layoutVersion = 0xff;
 //mres = 16         idler microstep resolution (uint8_t __res(AX_IDL))
 //1 pulley ustep = (d*pi)/(mres*FSPR) = 49.48 um
 
+static const uint16_t butler_offset = 536u; // ~ 26.5mm
+
 static eeprom_t * const eepromBase = reinterpret_cast<eeprom_t*>(0); //!< First EEPROM address
 static const uint16_t eepromEmpty = 0xffff; //!< EEPROM content when erased
-static const uint16_t eepromLengthCorrectionBase = 7900u; //!< legacy bowden length correction base (~391mm)
-static const uint16_t eepromBowdenLenDefault = 8900u; //!< Default bowden length (~427 mm)
-static const uint16_t eepromBowdenLenMinimum = 6900u; //!< Minimum bowden length (~341 mm)
-static const uint16_t eepromBowdenLenMaximum = 16000u; //!< Maximum bowden length (~792 mm)
+static const uint16_t eepromLengthCorrectionBase = 7900u + butler_offset; //!< legacy bowden length correction base (~391mm)
+static const uint16_t eepromBowdenLenDefault = 8900u + butler_offset; //!< Default bowden length (~427 mm)
+static const uint16_t eepromBowdenLenMinimum = 6900u + butler_offset; //!< Minimum bowden length (~341 mm)
+static const uint16_t eepromBowdenLenMaximum = 16000u + butler_offset; //!< Maximum bowden length (~792 mm)
 
 void permanentStorageInit()
 {
